@@ -1,8 +1,9 @@
 import streamlit as st
-import openai
+from openai import OpenAI
 import time
 import qrcode
 from io import BytesIO
+import base64
 from PIL import Image
 import requests
 
@@ -14,7 +15,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Initialize session state variables
+# Initialize session state
 if 'api_key' not in st.session_state:
     st.session_state.api_key = ''
 if 'page' not in st.session_state:
@@ -33,8 +34,10 @@ if not st.session_state.api_key:
         st.session_state.api_key = api_key_input
         st.experimental_rerun()
 else:
-    # Set OpenAI API key
-    openai.api_key = st.session_state.api_key
+    # Initialize OpenAI client with the provided API key
+    client = OpenAI(
+        api_key=st.session_state.api_key
+    )
 
     # Custom styling
     st.markdown("""
@@ -275,7 +278,7 @@ else:
             Ensure the image is family-friendly and appropriate for all ages.
             """
 
-            response = openai.ChatCompletion.create(
+            response = client.chat.completions.create(
                 model="gpt-4",
                 messages=[
                     {"role": "system",
@@ -302,14 +305,17 @@ else:
             return None, None
 
     def generate_dalle_image(prompt):
-        """Generate image using DALL-E"""
+        """Generate image using DALL-E 3"""
         try:
-            response = openai.Image.create(
+            response = client.images.generate(
+                model="dall-e-3",
                 prompt=prompt,
-                n=1,
-                size="1024x1024"
+                size="1792x1024",
+                quality="hd",
+                style="vivid",
+                n=1
             )
-            return response['data'][0]['url']
+            return response.data[0].url
         except Exception as e:
             st.error(f"შეცდომა სურათის გენერაციისას: {str(e)}")
             return None
@@ -427,7 +433,7 @@ else:
                     "filter": filter_effect
                 }
                 st.session_state.page = 'generate'
-                st.experimental_rerun()
+                st.rerun()
 
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -486,7 +492,7 @@ else:
                     with col2:
                         if st.button("🔄 ახალი სურათი"):
                             st.session_state.page = 'input'
-                            st.experimental_rerun()
+                            st.rerun()
 
         st.markdown('</div>', unsafe_allow_html=True)
 
