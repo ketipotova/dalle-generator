@@ -24,12 +24,12 @@ if 'history' not in st.session_state:
 
 # Background images for each step
 BACKGROUNDS = {
-    1: "url_to_background_1.jpg",
-    2: "url_to_background_2.jpg",
-    3: "url_to_background_3.jpg",
-    4: "url_to_background_4.jpg",
-    5: "url_to_background_5.jpg",
-    6: "url_to_background_6.jpg"
+    1: "https://github.com/ketipotova/dalle-generator/blob/main/1.png?raw=true",
+    2: "https://github.com/ketipotova/dalle-generator/blob/main/2.png?raw=true",
+    3: "https://github.com/ketipotova/dalle-generator/blob/main/3.png?raw=true",
+    4: "https://github.com/ketipotova/dalle-generator/blob/main/5.png?raw=true",
+    5: "https://github.com/ketipotova/dalle-generator/blob/main/6.png?raw=true",
+    6: "https://github.com/ketipotova/dalle-generator/blob/main/6915f1b7-b2e3-4f12-8dde-18b09a0869fd.png?raw=true"
 }
 
 # Form fields configuration
