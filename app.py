@@ -3,8 +3,9 @@ from openai import OpenAI
 import time
 from io import BytesIO
 import qrcode
+import os
 
-# Must be the first Streamlit command
+# Page config
 st.set_page_config(
     page_title="AI სურათების გენერატორი",
     page_icon="🎨",
@@ -19,27 +20,45 @@ if 'current_step' not in st.session_state:
     st.session_state.current_step = 1
 if 'user_data' not in st.session_state:
     st.session_state.user_data = {}
-if 'history' not in st.session_state:
-    st.session_state.history = []
-
-# Background images for each step
-BACKGROUNDS = {
-    1: "https://github.com/ketipotova/dalle-generator/blob/main/1.png?raw=true",
-    2: "https://github.com/ketipotova/dalle-generator/blob/main/2.png?raw=true",
-    3: "https://github.com/ketipotova/dalle-generator/blob/main/3.png?raw=true",
-    4: "https://github.com/ketipotova/dalle-generator/blob/main/5.png?raw=true",
-    5: "https://github.com/ketipotova/dalle-generator/blob/main/6.png?raw=true",
-    6: "https://github.com/ketipotova/dalle-generator/blob/main/6915f1b7-b2e3-4f12-8dde-18b09a0869fd.png?raw=true"
-}
 
 # Form fields configuration
 FORM_FIELDS = {
-    1: {"name": "name", "label": "სახელი", "type": "text"},
-    2: {"name": "gender", "label": "სქესი", "type": "text"},
-    3: {"name": "age", "label": "ასაკი", "type": "number"},
-    4: {"name": "profession", "label": "პროფესია", "type": "text"},
-    5: {"name": "hobby", "label": "ჰობი", "type": "text"},
-    6: {"name": "style", "label": "სტილი", "type": "text"}
+    1: {
+        "name": "name",
+        "label": "სახელი",
+        "type": "text",
+        "placeholder": "შეიყვანეთ თქვენი სახელი..."
+    },
+    2: {
+        "name": "gender",
+        "label": "სქესი",
+        "type": "text",
+        "placeholder": "შეიყვანეთ თქვენი სქესი..."
+    },
+    3: {
+        "name": "age",
+        "label": "ასაკი",
+        "type": "number",
+        "placeholder": "შეიყვანეთ თქვენი ასაკი..."
+    },
+    4: {
+        "name": "profession",
+        "label": "პროფესია",
+        "type": "text",
+        "placeholder": "შეიყვანეთ თქვენი პროფესია..."
+    },
+    5: {
+        "name": "hobby",
+        "label": "ჰობი",
+        "type": "text",
+        "placeholder": "შეიყვანეთ თქვენი ჰობი..."
+    },
+    6: {
+        "name": "style",
+        "label": "სტილი",
+        "type": "text",
+        "placeholder": "შეიყვანეთ სასურველი სტილი..."
+    }
 }
 
 # Custom styling
@@ -52,103 +71,121 @@ st.markdown("""
 
     /* Base theme */
     .stApp {
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
-        min-height: 100vh;
+        background-color: #070B34;
+        background-image: linear-gradient(rgba(7, 11, 52, 0.9), rgba(7, 11, 52, 0.9));
     }
 
     /* Form container */
     .form-container {
-        background: rgba(255, 255, 255, 0.1);
-        backdrop-filter: blur(10px);
         padding: 2rem;
-        border-radius: 20px;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        max-width: 500px;
-        margin: 2rem auto;
+        max-width: 600px;
+        margin: 4rem auto;
     }
 
-    /* Progress bar */
-    .stProgress > div > div > div {
-        background: linear-gradient(45deg, #FF9A9E, #FAD0C4);
+    /* Progress line */
+    .progress-line {
+        height: 2px;
+        background: rgba(255, 255, 255, 0.1);
+        margin-bottom: 3rem;
+        position: relative;
     }
 
-    /* Button styling */
-    .stButton > button {
+    .progress-line-fill {
+        position: absolute;
+        height: 100%;
+        background: linear-gradient(90deg, #FF9A9E, #FAD0C4);
+        transition: width 0.3s ease;
+    }
+
+    /* Input field */
+    .stTextInput > div > div > input,
+    .stNumberInput > div > div > input {
+        background-color: rgba(0, 0, 0, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: white;
+        border-radius: 8px;
+        padding: 1rem;
+        font-size: 1rem;
+        width: 100%;
+    }
+
+    .stTextInput > div > div > input:focus,
+    .stNumberInput > div > div > input:focus {
+        border-color: rgba(255, 154, 158, 0.5);
+        box-shadow: none;
+    }
+
+    /* Button container */
+    .button-container {
+        display: flex;
+        gap: 1rem;
+        margin-top: 1.5rem;
+    }
+
+    /* Next button */
+    .next-button {
         background: linear-gradient(45deg, #FF9A9E, #FAD0C4);
-        color: #1a1a2e;
+        color: white;
         border: none;
         padding: 0.75rem 2rem;
-        border-radius: 10px;
-        font-weight: bold;
+        border-radius: 8px;
+        cursor: pointer;
+        width: 100%;
         transition: all 0.3s ease;
+        font-weight: 500;
     }
 
-    .stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 5px 15px rgba(255, 154, 158, 0.4);
+    /* Skip button */
+    .skip-button {
+        background: rgba(255, 154, 158, 0.1);
+        color: #FF9A9E;
+        border: none;
+        padding: 0.75rem 2rem;
+        border-radius: 8px;
+        cursor: pointer;
+        width: 100%;
+        transition: all 0.3s ease;
+        font-weight: 500;
     }
 
-    /* Input styling */
-    .stTextInput > div > div > input {
-        background: rgba(255, 255, 255, 0.1);
+    /* Step indicator */
+    .step-text {
         color: white;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        border-radius: 10px;
-        padding: 0.75rem 1rem;
+        font-size: 1.5rem;
+        margin-bottom: 1.5rem;
+        font-weight: 500;
     }
 
-    .stNumberInput > div > div > input {
-        background: rgba(255, 255, 255, 0.1);
+    /* Label */
+    .field-label {
         color: white;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        border-radius: 10px;
-        padding: 0.75rem 1rem;
+        font-size: 1.25rem;
+        margin-bottom: 1rem;
+        font-weight: 500;
     }
     </style>
 """, unsafe_allow_html=True)
 
-def set_background(step):
-    """Set the background image for the current step"""
-    st.markdown(
-        f"""
-        <style>
-        .stApp {{
-            background-image: url({BACKGROUNDS[step]});
-        }}
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
-
-def next_step():
-    """Advance to the next step"""
-    if st.session_state.current_step < 6:
-        st.session_state.current_step += 1
-
-def skip_step():
-    """Skip the current step"""
-    if st.session_state.current_step < 6:
-        st.session_state.current_step += 1
-
 def display_form_step():
-    """Display the current form step"""
+    """Display the current form step with correct button layout"""
     current_step = st.session_state.current_step
     field = FORM_FIELDS[current_step]
     
-    # Set background for current step
-    set_background(current_step)
+    st.markdown('<div class="form-container">', unsafe_allow_html=True)
     
-    # Display progress
-    progress = current_step / 6
-    st.progress(progress)
+    # Progress line
+    progress_width = (current_step - 1) / 5 * 100  # Calculate width percentage
+    st.markdown(f"""
+        <div class="progress-line">
+            <div class="progress-line-fill" style="width: {progress_width}%"></div>
+        </div>
+    """, unsafe_allow_html=True)
     
-    st.markdown(f'<div class="form-container">', unsafe_allow_html=True)
+    # Step indicator
+    st.markdown(f'<div class="step-text">Step {current_step}/6</div>', unsafe_allow_html=True)
     
-    # Title
-    st.title(f"Step {current_step}/6")
-    st.subheader(field["label"])
+    # Field label
+    st.markdown(f'<div class="field-label">{field["label"]}</div>', unsafe_allow_html=True)
     
     # Input field
     if field["type"] == "number":
@@ -156,27 +193,32 @@ def display_form_step():
             field["label"],
             min_value=0,
             max_value=120,
-            label_visibility="collapsed"
+            label_visibility="collapsed",
+            placeholder=field["placeholder"]
         )
     else:
         value = st.text_input(
             field["label"],
-            label_visibility="collapsed"
+            label_visibility="collapsed",
+            placeholder=field["placeholder"]
         )
     
-    # Buttons
+    # Buttons - using columns for layout
     col1, col2 = st.columns(2)
+    
     with col1:
-        if st.button("Next", use_container_width=True):
-            if value:  # Save value if provided
+        if st.button("Next", key="next", use_container_width=True):
+            if value:
                 st.session_state.user_data[field["name"]] = value
-            next_step()
-            st.experimental_rerun()
+            if current_step < 6:
+                st.session_state.current_step += 1
+                st.experimental_rerun()
     
     with col2:
-        if st.button("Skip", use_container_width=True):
-            skip_step()
-            st.experimental_rerun()
+        if st.button("Skip", key="skip", use_container_width=True):
+            if current_step < 6:
+                st.session_state.current_step += 1
+                st.experimental_rerun()
     
     st.markdown('</div>', unsafe_allow_html=True)
 
