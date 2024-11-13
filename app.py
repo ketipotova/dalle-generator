@@ -32,67 +32,101 @@ BACKGROUNDS = {
 
 # Form fields configuration
 FORM_FIELDS = {
-    1: {
-        "name": "name",
-        "label": "სახელი",
-        "type": "text",
-        "placeholder": "შეიყვანეთ თქვენი სახელი..."
-    },
-    2: {
-        "name": "gender",
-        "label": "სქესი",
-        "type": "text",
-        "placeholder": "შეიყვანეთ თქვენი სქესი..."
-    },
-    3: {
-        "name": "age",
-        "label": "ასაკი",
-        "type": "number",
-        "placeholder": "შეიყვანეთ თქვენი ასაკი..."
-    },
-    4: {
-        "name": "profession",
-        "label": "პროფესია",
-        "type": "text",
-        "placeholder": "შეიყვანეთ თქვენი პროფესია..."
-    },
-    5: {
-        "name": "hobby",
-        "label": "ჰობი",
-        "type": "text",
-        "placeholder": "შეიყვანეთ თქვენი ჰობი..."
-    },
-    6: {
-        "name": "style",
-        "label": "სტილი",
-        "type": "text",
-        "placeholder": "შეიყვანეთ სასურველი სტილი..."
-    }
+    1: {"name": "name", "label": "სახელი", "type": "text"},
+    2: {"name": "gender", "label": "სქესი", "type": "text"},
+    3: {"name": "age", "label": "ასაკი", "type": "number"},
+    4: {"name": "profession", "label": "პროფესია", "type": "text"},
+    5: {"name": "hobby", "label": "ჰობი", "type": "text"},
+    6: {"name": "style", "label": "სტილი", "type": "text"}
 }
 
-def set_background(step):
-    """Set the background image for the current step"""
-    st.markdown(
-        f"""
-        <style>
-        .stApp {{
-            background-image: url({BACKGROUNDS[step]});
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-        }}
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
+def create_dalle_prompt(user_data):
+    """Create a detailed prompt for DALL-E using GPT-4"""
+    client = OpenAI(api_key=st.session_state.api_key)
+    
+    prompt_request = f"""
+    Create a detailed image generation prompt based on this information:
+    - Name: {user_data.get('name', '')}
+    - Gender: {user_data.get('gender', '')}
+    - Age: {user_data.get('age', '')}
+    - Profession: {user_data.get('profession', '')}
+    - Hobby: {user_data.get('hobby', '')}
+    - Preferred style: {user_data.get('style', '')}
 
-# Custom styling
+    Requirements:
+    1. Create a cinematic, visually striking scene
+    2. The image should be optimized for 9:16 aspect ratio (portrait orientation)
+    3. Include a frame or border element in the composition
+    4. Make it personal and specific to the individual
+    5. Focus on high-quality, detailed visuals
+    6. Keep it family-friendly and appropriate
+    7. Add dramatic lighting and atmospheric elements
+
+    Return only the prompt text, no explanations.
+    """
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "You are an expert at crafting detailed image generation prompts."},
+                {"role": "user", "content": prompt_request}
+            ],
+            temperature=0.7
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        st.error(f"Error generating prompt: {str(e)}")
+        return None
+
+def generate_image(prompt):
+    """Generate image using DALL-E 3"""
+    try:
+        client = OpenAI(api_key=st.session_state.api_key)
+        response = client.images.generate(
+            model="dall-e-3",
+            prompt=prompt,
+            size="1024x1792",  # 9:16 ratio
+            quality="hd",
+            n=1
+        )
+        return response.data[0].url
+    except Exception as e:
+        st.error(f"Error generating image: {str(e)}")
+        return None
+
+def create_qr_code(url):
+    """Create a QR code for the given URL"""
+    try:
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(url)
+        qr.make(fit=True)
+        qr_image = qr.make_image(fill_color="black", back_color="white")
+        buffered = BytesIO()
+        qr_image.save(buffered, format="PNG")
+        return buffered.getvalue()
+    except Exception as e:
+        st.error(f"QR კოდის შექმნის შეცდომა: {str(e)}")
+        return None
+
 st.markdown("""
     <style>
     /* Hide Streamlit elements */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
+
+    /* Base theme */
+    .stApp {
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+    }
 
     /* Form container */
     .form-container {
@@ -116,7 +150,7 @@ st.markdown("""
         transition: width 0.3s ease;
     }
 
-    /* Input field */
+    /* Input fields */
     .stTextInput > div > div > input,
     .stNumberInput > div > div > input {
         background-color: rgba(0, 0, 0, 0.2);
@@ -125,48 +159,32 @@ st.markdown("""
         border-radius: 8px;
         padding: 1rem;
         font-size: 1rem;
+    }
+
+    /* Button styles */
+    .stButton > button {
         width: 100%;
+        border: none;
+        padding: 0.75rem 2rem;
+        cursor: pointer;
+        font-weight: 500;
+        border-radius: 8px;
     }
 
-    .stTextInput > div > div > input:focus,
-    .stNumberInput > div > div > input:focus {
-        border-color: rgba(255, 154, 158, 0.5);
-        box-shadow: none;
-    }
-
-    /* Custom button container */
-    .button-container {
-        display: grid;
-        grid-template-columns: 1fr auto 1fr;
-        gap: 1rem;
-        align-items: center;
-        margin-top: 2rem;
-    }
-
-    /* Back and Next buttons (with frame) */
-    .framed-button {
+    /* Back and Next buttons */
+    .stButton.back-button > button,
+    .stButton.next-button > button {
         background: linear-gradient(45deg, #FF9A9E, #FAD0C4);
         color: white;
-        border: none;
-        padding: 0.75rem 2rem;
-        border-radius: 8px;
-        width: 100%;
-        cursor: pointer;
-        transition: all 0.3s ease;
     }
 
-    /* Skip button (without frame) */
-    .skip-button {
+    /* Skip button */
+    .stButton.skip-button > button {
         background: transparent;
         color: #FF9A9E;
-        border: none;
-        padding: 0.75rem 2rem;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        text-align: center;
     }
 
-    /* Step indicator */
+    /* Step text */
     .step-text {
         color: white;
         font-size: 1.5rem;
@@ -181,11 +199,44 @@ st.markdown("""
         margin-bottom: 1rem;
         font-weight: 500;
     }
+
+    /* Generated image container */
+    .generated-image {
+        padding: 20px;
+        background: white;
+        border-radius: 10px;
+        margin: 2rem auto;
+        max-width: 90%;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    /* QR code container */
+    .qr-container {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 15px;
+        margin: 1rem auto;
+        max-width: 200px;
+        text-align: center;
+    }
     </style>
 """, unsafe_allow_html=True)
 
+def set_background(step):
+    """Set the background image for the current step"""
+    st.markdown(
+        f"""
+        <style>
+        .stApp {{
+            background-image: url({BACKGROUNDS[step]});
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
 def display_form_step():
-    """Display the current form step with three-button layout"""
+    """Display the current form step"""
     current_step = st.session_state.current_step
     field = FORM_FIELDS[current_step]
     
@@ -212,64 +263,54 @@ def display_form_step():
             field["label"],
             min_value=0,
             max_value=120,
-            label_visibility="collapsed",
-            placeholder=field["placeholder"]
+            label_visibility="collapsed"
         )
     else:
         value = st.text_input(
             field["label"],
-            label_visibility="collapsed",
-            placeholder=field["placeholder"]
+            label_visibility="collapsed"
         )
     
-    # Custom button layout using HTML/CSS
-    st.markdown("""
-        <div class="button-container">
-            <button onclick="goBack()" class="framed-button">Back</button>
-            <button onclick="skipStep()" class="skip-button">Skip</button>
-            <button onclick="goNext()" class="framed-button">Next</button>
-        </div>
-    """, unsafe_allow_html=True)
-
-    # Hidden buttons for Streamlit state management
-    col1, col2, col3 = st.columns([1, 1, 1])
+    # Buttons layout
+    col1, col2, col3 = st.columns([1, 0.7, 1])
+    
     with col1:
-        if current_step > 1 and st.button("Back", key="back_button", use_container_width=True):
-            st.session_state.current_step -= 1
-            st.experimental_rerun()
+        if current_step > 1:
+            if st.button("Back", use_container_width=True):
+                st.session_state.current_step -= 1
+                st.experimental_rerun()
     
     with col2:
-        if st.button("Skip", key="skip_button", use_container_width=True):
+        if st.button("Skip", use_container_width=True):
             if current_step < 6:
                 st.session_state.current_step += 1
                 st.experimental_rerun()
     
     with col3:
-        if st.button("Next", key="next_button", use_container_width=True):
+        if st.button("Next", use_container_width=True):
             if value:
                 st.session_state.user_data[field["name"]] = value
             if current_step < 6:
                 st.session_state.current_step += 1
-                st.experimental_rerun()
+            elif current_step == 6:
+                # Generate image on final step
+                prompt = create_dalle_prompt(st.session_state.user_data)
+                if prompt:
+                    image_url = generate_image(prompt)
+                    if image_url:
+                        st.markdown('<div class="generated-image">', unsafe_allow_html=True)
+                        st.image(image_url, caption="Your AI-generated image")
+                        st.markdown('</div>', unsafe_allow_html=True)
+                        
+                        # QR Code
+                        qr_code = create_qr_code(image_url)
+                        if qr_code:
+                            st.markdown('<div class="qr-container">', unsafe_allow_html=True)
+                            st.image(qr_code, caption="Scan to download")
+                            st.markdown('</div>', unsafe_allow_html=True)
+            st.experimental_rerun()
     
     st.markdown('</div>', unsafe_allow_html=True)
-
-    # JavaScript for button interactions
-    st.markdown("""
-        <script>
-        function goBack() {
-            document.querySelector('button[key="back_button"]').click();
-        }
-        
-        function skipStep() {
-            document.querySelector('button[key="skip_button"]').click();
-        }
-        
-        function goNext() {
-            document.querySelector('button[key="next_button"]').click();
-        }
-        </script>
-    """, unsafe_allow_html=True)
 
 def main():
     """Main application function"""
