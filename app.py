@@ -3,7 +3,6 @@ from openai import OpenAI
 import time
 from io import BytesIO
 import qrcode
-import os
 
 # Page config
 st.set_page_config(
@@ -20,6 +19,16 @@ if 'current_step' not in st.session_state:
     st.session_state.current_step = 1
 if 'user_data' not in st.session_state:
     st.session_state.user_data = {}
+
+# Background images from GitHub
+BACKGROUNDS = {
+    1: "https://github.com/ketipotova/dalle-generator/blob/main/1.png?raw=true",
+    2: "https://github.com/ketipotova/dalle-generator/blob/main/2.png?raw=true",
+    3: "https://github.com/ketipotova/dalle-generator/blob/main/3.png?raw=true",
+    4: "https://github.com/ketipotova/dalle-generator/blob/main/5.png?raw=true",
+    5: "https://github.com/ketipotova/dalle-generator/blob/main/6.png?raw=true",
+    6: "https://github.com/ketipotova/dalle-generator/blob/main/6915f1b7-b2e3-4f12-8dde-18b09a0869fd.png?raw=true"
+}
 
 # Form fields configuration
 FORM_FIELDS = {
@@ -61,6 +70,22 @@ FORM_FIELDS = {
     }
 }
 
+def set_background(step):
+    """Set the background image for the current step"""
+    st.markdown(
+        f"""
+        <style>
+        .stApp {{
+            background-image: url({BACKGROUNDS[step]});
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
 # Custom styling
 st.markdown("""
     <style>
@@ -68,12 +93,6 @@ st.markdown("""
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
-
-    /* Base theme */
-    .stApp {
-        background-color: #070B34;
-        background-image: linear-gradient(rgba(7, 11, 52, 0.9), rgba(7, 11, 52, 0.9));
-    }
 
     /* Form container */
     .form-container {
@@ -122,8 +141,8 @@ st.markdown("""
         margin-top: 1.5rem;
     }
 
-    /* Next button */
-    .next-button {
+    /* Buttons */
+    .stButton > button {
         background: linear-gradient(45deg, #FF9A9E, #FAD0C4);
         color: white;
         border: none;
@@ -135,17 +154,10 @@ st.markdown("""
         font-weight: 500;
     }
 
-    /* Skip button */
-    .skip-button {
+    /* Skip button specific style */
+    .stButton > button:nth-of-type(2) {
         background: rgba(255, 154, 158, 0.1);
         color: #FF9A9E;
-        border: none;
-        padding: 0.75rem 2rem;
-        border-radius: 8px;
-        cursor: pointer;
-        width: 100%;
-        transition: all 0.3s ease;
-        font-weight: 500;
     }
 
     /* Step indicator */
@@ -167,14 +179,17 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 def display_form_step():
-    """Display the current form step with correct button layout"""
+    """Display the current form step"""
     current_step = st.session_state.current_step
     field = FORM_FIELDS[current_step]
+    
+    # Set background for current step
+    set_background(current_step)
     
     st.markdown('<div class="form-container">', unsafe_allow_html=True)
     
     # Progress line
-    progress_width = (current_step - 1) / 5 * 100  # Calculate width percentage
+    progress_width = (current_step - 1) / 5 * 100
     st.markdown(f"""
         <div class="progress-line">
             <div class="progress-line-fill" style="width: {progress_width}%"></div>
