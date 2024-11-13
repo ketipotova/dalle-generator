@@ -3,6 +3,8 @@ from openai import OpenAI
 import time
 from io import BytesIO
 import qrcode
+import requests
+from PIL import Image
 
 # Page config
 st.set_page_config(
@@ -19,6 +21,8 @@ if 'current_step' not in st.session_state:
     st.session_state.current_step = 1
 if 'user_data' not in st.session_state:
     st.session_state.user_data = {}
+if 'generated_image' not in st.session_state:
+    st.session_state.generated_image = None
 
 # Background images from GitHub
 BACKGROUNDS = {
@@ -29,6 +33,9 @@ BACKGROUNDS = {
     5: "https://github.com/ketipotova/dalle-generator/blob/main/6.png?raw=true",
     6: "https://github.com/ketipotova/dalle-generator/blob/main/6915f1b7-b2e3-4f12-8dde-18b09a0869fd.png?raw=true"
 }
+
+# Frame image URL
+FRAME_URL = "https://github.com/ketipotova/dalle-generator/blob/main/frame.jpeg?raw=true"
 
 # Form fields configuration
 FORM_FIELDS = {
@@ -56,11 +63,11 @@ def create_dalle_prompt(user_data):
     Requirements:
     1. Create a cinematic, visually striking scene
     2. The image should be optimized for 9:16 aspect ratio (portrait orientation)
-    3. Include a frame or border element in the composition
+    3. Include dramatic lighting and atmospheric elements
     4. Make it personal and specific to the individual
     5. Focus on high-quality, detailed visuals
     6. Keep it family-friendly and appropriate
-    7. Add dramatic lighting and atmospheric elements
+    7. Leave space around the edges for a frame
 
     Return only the prompt text, no explanations.
     """
@@ -95,6 +102,37 @@ def generate_image(prompt):
         st.error(f"Error generating image: {str(e)}")
         return None
 
+def add_frame_to_image(image_url):
+    """Add frame to the generated image"""
+    try:
+        # Download the generated image
+        response = requests.get(image_url)
+        img = Image.open(BytesIO(response.content))
+        
+        # Download the frame
+        frame_response = requests.get(FRAME_URL)
+        frame = Image.open(BytesIO(frame_response.content))
+        
+        # Resize frame to match the image dimensions
+        frame = frame.resize(img.size)
+        
+        # Create a new image with the same size and mode
+        final_image = Image.new('RGBA', img.size)
+        
+        # Paste the original image
+        final_image.paste(img, (0, 0))
+        
+        # Paste the frame on top
+        final_image.paste(frame, (0, 0), frame if frame.mode == 'RGBA' else None)
+        
+        # Save to BytesIO
+        buffered = BytesIO()
+        final_image.save(buffered, format="PNG")
+        return buffered.getvalue()
+    except Exception as e:
+        st.error(f"Error adding frame: {str(e)}")
+        return None
+
 def create_qr_code(url):
     """Create a QR code for the given URL"""
     try:
@@ -114,6 +152,7 @@ def create_qr_code(url):
         st.error(f"QR კოდის შექმნის შეცდომა: {str(e)}")
         return None
 
+# Custom CSS
 st.markdown("""
     <style>
     /* Hide Streamlit elements */
@@ -172,19 +211,19 @@ st.markdown("""
     }
 
     /* Back and Next buttons */
-    .stButton.back-button > button,
-    .stButton.next-button > button {
-        background: linear-gradient(45deg, #FF9A9E, #FAD0C4);
-        color: white;
+    .back-button > button,
+    .next-button > button {
+        background: linear-gradient(45deg, #FF9A9E, #FAD0C4) !important;
+        color: white !important;
     }
 
     /* Skip button */
-    .stButton.skip-button > button {
-        background: transparent;
-        color: #FF9A9E;
+    .skip-button > button {
+        background: transparent !important;
+        color: #FF9A9E !important;
     }
 
-    /* Step text */
+    /* Text styles */
     .step-text {
         color: white;
         font-size: 1.5rem;
@@ -192,7 +231,6 @@ st.markdown("""
         font-weight: 500;
     }
 
-    /* Label */
     .field-label {
         color: white;
         font-size: 1.25rem;
@@ -203,14 +241,13 @@ st.markdown("""
     /* Generated image container */
     .generated-image {
         padding: 20px;
-        background: white;
+        background: rgba(255, 255, 255, 0.1);
         border-radius: 10px;
         margin: 2rem auto;
         max-width: 90%;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
     }
 
-    /* QR code container */
+    /* QR container */
     .qr-container {
         background: white;
         padding: 1.5rem;
@@ -263,54 +300,62 @@ def display_form_step():
             field["label"],
             min_value=0,
             max_value=120,
-            label_visibility="collapsed"
+            label_visibility="collapsed",
+            key=f"input_{current_step}"
         )
     else:
         value = st.text_input(
             field["label"],
-            label_visibility="collapsed"
+            label_visibility="collapsed",
+            key=f"input_{current_step}"
         )
+
+    # Button layout with proper styling
+    cols = st.columns([1, 0.7, 1])
     
-    # Buttons layout
-    col1, col2, col3 = st.columns([1, 0.7, 1])
-    
-    with col1:
+    # Back button
+    with cols[0]:
         if current_step > 1:
-            if st.button("Back", use_container_width=True):
+            back = st.button("Back", key="back", use_container_width=True)
+            if back:
                 st.session_state.current_step -= 1
-                st.experimental_rerun()
+                st.rerun()
     
-    with col2:
-        if st.button("Skip", use_container_width=True):
-            if current_step < 6:
-                st.session_state.current_step += 1
-                st.experimental_rerun()
+    # Skip button
+    with cols[1]:
+        skip = st.button("Skip", key="skip", use_container_width=True)
+        if skip and current_step < 6:
+            st.session_state.current_step += 1
+            st.rerun()
     
-    with col3:
-        if st.button("Next", use_container_width=True):
+    # Next button
+    with cols[2]:
+        next = st.button("Next", key="next", use_container_width=True)
+        if next:
             if value:
                 st.session_state.user_data[field["name"]] = value
             if current_step < 6:
                 st.session_state.current_step += 1
+                st.rerun()
             elif current_step == 6:
                 # Generate image on final step
                 prompt = create_dalle_prompt(st.session_state.user_data)
                 if prompt:
                     image_url = generate_image(prompt)
                     if image_url:
-                        st.markdown('<div class="generated-image">', unsafe_allow_html=True)
-                        st.image(image_url, caption="Your AI-generated image")
-                        st.markdown('</div>', unsafe_allow_html=True)
-                        
-                        # QR Code
-                        qr_code = create_qr_code(image_url)
-                        if qr_code:
-                            st.markdown('<div class="qr-container">', unsafe_allow_html=True)
-                            st.image(qr_code, caption="Scan to download")
+                        # Add frame to the image
+                        framed_image = add_frame_to_image(image_url)
+                        if framed_image:
+                            st.markdown('<div class="generated-image">', unsafe_allow_html=True)
+                            st.image(framed_image, caption="Your AI-generated image")
                             st.markdown('</div>', unsafe_allow_html=True)
-            st.experimental_rerun()
-    
-    st.markdown('</div>', unsafe_allow_html=True)
+                            
+                            # QR Code
+                            qr_code = create_qr_code(image_url)
+                            if qr_code:
+                                st.markdown('<div class="qr-container">', unsafe_allow_html=True)
+                                st.image(qr_code, caption="Scan to download")
+                                st.markdown('</div>', unsafe_allow_html=True)
 
 def main():
     """Main application function"""
@@ -319,7 +364,7 @@ def main():
         api_key_input = st.text_input("API გასაღები", type="password")
         if api_key_input:
             st.session_state.api_key = api_key_input
-            st.experimental_rerun()
+            st.rerun()
     else:
         display_form_step()
 
