@@ -134,30 +134,36 @@ st.markdown("""
         box-shadow: none;
     }
 
-    /* Button container */
+    /* Custom button container */
     .button-container {
-        display: flex;
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
         gap: 1rem;
-        margin-top: 1.5rem;
+        align-items: center;
+        margin-top: 2rem;
     }
 
-    /* Buttons */
-    .stButton > button {
+    /* Back and Next buttons (with frame) */
+    .framed-button {
         background: linear-gradient(45deg, #FF9A9E, #FAD0C4);
         color: white;
         border: none;
         padding: 0.75rem 2rem;
         border-radius: 8px;
-        cursor: pointer;
         width: 100%;
+        cursor: pointer;
         transition: all 0.3s ease;
-        font-weight: 500;
     }
 
-    /* Skip button specific style */
-    .stButton > button:nth-of-type(2) {
-        background: rgba(255, 154, 158, 0.1);
+    /* Skip button (without frame) */
+    .skip-button {
+        background: transparent;
         color: #FF9A9E;
+        border: none;
+        padding: 0.75rem 2rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-align: center;
     }
 
     /* Step indicator */
@@ -179,7 +185,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 def display_form_step():
-    """Display the current form step"""
+    """Display the current form step with three-button layout"""
     current_step = st.session_state.current_step
     field = FORM_FIELDS[current_step]
     
@@ -196,10 +202,8 @@ def display_form_step():
         </div>
     """, unsafe_allow_html=True)
     
-    # Step indicator
+    # Step indicator and label
     st.markdown(f'<div class="step-text">Step {current_step}/6</div>', unsafe_allow_html=True)
-    
-    # Field label
     st.markdown(f'<div class="field-label">{field["label"]}</div>', unsafe_allow_html=True)
     
     # Input field
@@ -218,24 +222,54 @@ def display_form_step():
             placeholder=field["placeholder"]
         )
     
-    # Buttons - using columns for layout
-    col1, col2 = st.columns(2)
-    
+    # Custom button layout using HTML/CSS
+    st.markdown("""
+        <div class="button-container">
+            <button onclick="goBack()" class="framed-button">Back</button>
+            <button onclick="skipStep()" class="skip-button">Skip</button>
+            <button onclick="goNext()" class="framed-button">Next</button>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # Hidden buttons for Streamlit state management
+    col1, col2, col3 = st.columns([1, 1, 1])
     with col1:
-        if st.button("Next", key="next", use_container_width=True):
+        if current_step > 1 and st.button("Back", key="back_button", use_container_width=True):
+            st.session_state.current_step -= 1
+            st.experimental_rerun()
+    
+    with col2:
+        if st.button("Skip", key="skip_button", use_container_width=True):
+            if current_step < 6:
+                st.session_state.current_step += 1
+                st.experimental_rerun()
+    
+    with col3:
+        if st.button("Next", key="next_button", use_container_width=True):
             if value:
                 st.session_state.user_data[field["name"]] = value
             if current_step < 6:
                 st.session_state.current_step += 1
                 st.experimental_rerun()
     
-    with col2:
-        if st.button("Skip", key="skip", use_container_width=True):
-            if current_step < 6:
-                st.session_state.current_step += 1
-                st.experimental_rerun()
-    
     st.markdown('</div>', unsafe_allow_html=True)
+
+    # JavaScript for button interactions
+    st.markdown("""
+        <script>
+        function goBack() {
+            document.querySelector('button[key="back_button"]').click();
+        }
+        
+        function skipStep() {
+            document.querySelector('button[key="skip_button"]').click();
+        }
+        
+        function goNext() {
+            document.querySelector('button[key="next_button"]').click();
+        }
+        </script>
+    """, unsafe_allow_html=True)
 
 def main():
     """Main application function"""
